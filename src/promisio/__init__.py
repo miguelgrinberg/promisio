@@ -2,10 +2,8 @@ import asyncio
 from functools import partial, wraps
 import inspect
 
-
-class UnhandledRejection(RuntimeError):
-    def __init__(self, error):
-        self.error = error
+if not hasattr(asyncio, 'create_task'):
+    asyncio.create_task = asyncio.ensure_future
 
 
 class AggregateError(RuntimeError):
@@ -100,10 +98,12 @@ class Promise:
 
     @classmethod
     def resolve(cls, result):
-        if isinstance(result, Promise):
-            return result
         promise = cls()
-        promise._resolve(result)
+        if isinstance(result, Promise):
+            result.then(lambda res: promise._resolve(res),
+                        lambda err: promise._reject(err))
+        else:
+            promise._resolve(result)
         return promise
 
     @classmethod
@@ -165,7 +165,7 @@ class Promise:
 
     def __await__(self):
         def _reject(error):
-            raise UnhandledRejection(error)
+            raise error
 
         return self.catch(_reject).future.__await__()
 
@@ -183,9 +183,6 @@ def promisify(func):
             task.add_done_callback(
                 partial(Promise._handle_done, None, None, promise))
             return promise
-
-        elif isinstance(result, Promise):
-            return result
         else:
             return Promise.resolve(result)
 
@@ -194,17 +191,6 @@ def promisify(func):
 
 def run(func, *args, **kwargs):
     async def _run():
-        asyncio.create_task(func(*args, **kwargs))
-        pending_tasks = [task for task in asyncio.all_tasks()
-                         if task != asyncio.current_task()]
-        while pending_tasks:
-            try:
-                await asyncio.gather(*pending_tasks)
-            except UnhandledRejection as error:
-                raise error
-            except Exception:
-                pass
-            pending_tasks = [task for task in asyncio.all_tasks()
-                             if task != asyncio.current_task()]
+        return await Promise.resolve(func(*args, **kwargs))
 
-    asyncio.run(_run())
+    return asyncio.get_event_loop().run_until_complete(_run())
