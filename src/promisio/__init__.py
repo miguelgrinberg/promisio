@@ -150,14 +150,10 @@ class Promise:
                     promise._resolve(callback_result)
             except BaseException as error:
                 promise._reject(error)
+        elif resolve:
+            promise._resolve(result)
         else:
-            if isinstance(result, Promise):
-                result.then(lambda res: promise._resolve(res),
-                            lambda err: promise._reject(err))
-            elif resolve:
-                promise._resolve(result)
-            else:
-                promise._reject(result)
+            promise._reject(result)
 
     @classmethod
     def _handle_done(cls, on_resolved, on_rejected, promise, future):

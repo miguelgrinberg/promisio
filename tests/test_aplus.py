@@ -1,17 +1,9 @@
 import asyncio
-from functools import wraps
 import unittest
 import pytest
 import promisio
 from promisio import Promise, promisify
-
-
-def async_test(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        asyncio.run(f(*args, **kwargs))
-
-    return wrapper
+from .utils import async_test, get_fake_error
 
 
 class TestAPlus(unittest.TestCase):
@@ -30,6 +22,7 @@ class TestAPlus(unittest.TestCase):
         p = Promise()
         p.then(123).then('foo').then({'foo': 'bar'}).then(['foo', 'bar'])
         p._resolve(42)
+        await p
 
     @async_test
     async def test_aplus_2_2_1_2(self):
@@ -37,7 +30,8 @@ class TestAPlus(unittest.TestCase):
         p = Promise()
         p.then(None, 123).then(None, 'foo').then(None, {'foo': 'bar'}).then(
             None, ['foo', 'bar'])
-        p._reject(RuntimeError('error'))
+        p._reject(get_fake_error())
+        await p.catch(lambda err: None)
 
     @async_test
     async def test_aplus_2_2_2_1(self):
@@ -51,10 +45,7 @@ class TestAPlus(unittest.TestCase):
         p = Promise()
         p.then(f)
         p._resolve(42)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p
         assert result == 42
 
     @async_test
@@ -69,10 +60,7 @@ class TestAPlus(unittest.TestCase):
         p = Promise()
         p.then(f)
         p._resolve(42)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p
         with pytest.raises(asyncio.InvalidStateError):
             p._resolve('foo')
         assert result == 42
@@ -81,36 +69,32 @@ class TestAPlus(unittest.TestCase):
     async def test_aplus_2_2_3_1(self):
         """Test that on_rejected is called when the promise is rejected."""
         result = None
+        error = get_fake_error()
 
         def f(x):
             nonlocal result
             result = x
 
         p = Promise()
-        p.then(None, f)
-        error = RuntimeError('error')
+        p2 = p.then(None, f)
         p._reject(error)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p2
         assert result == error
 
     @async_test
     async def test_aplus_2_2_3_3(self):
         """Test that on_rejected is only called once."""
         result = None
+        error = get_fake_error()
 
         def f(x):
             nonlocal result
             result = x
 
         p = Promise()
-        p.then(None, f)
-        error = RuntimeError('error')
+        p2 = p.then(None, f)
         p._reject(error)
-
-        await asyncio.sleep(0)
+        await p2
         with pytest.raises(asyncio.InvalidStateError):
             p._reject(ValueError('new error'))
         assert result == error
@@ -134,10 +118,7 @@ class TestAPlus(unittest.TestCase):
         p.then(g)
         p.then(h)
         p._resolve(42)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p
         assert result == [42, 43, 44]
 
     @async_test
@@ -157,12 +138,9 @@ class TestAPlus(unittest.TestCase):
         p = Promise()
         p.then(None, f)
         p.then(None, g)
-        p.then(None, h)
-        p._reject(RuntimeError('error'))
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        p2 = p.then(None, h)
+        p._reject(get_fake_error())
+        await p2
         assert result == ['f', 'g', 'h']
 
     @async_test
@@ -176,7 +154,7 @@ class TestAPlus(unittest.TestCase):
         """Test that an exception raised in on_resolved causes the next promise
         in the chain to be rejected with that exception."""
         result = None
-        error = RuntimeError('error')
+        error = get_fake_error()
 
         def f(x):
             raise error
@@ -189,12 +167,9 @@ class TestAPlus(unittest.TestCase):
             result = x
 
         p = Promise()
-        p.then(f).then(g, h)
+        p2 = p.then(f).then(g, h)
         p._resolve(42)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p2
         assert result == error
 
     @async_test
@@ -202,7 +177,7 @@ class TestAPlus(unittest.TestCase):
         """Test that an exception raised in on_rejected causes the next promise
         in the chain to be rejected with that exception."""
         result = None
-        error = RuntimeError('error')
+        error = get_fake_error()
 
         def f(x):
             raise error
@@ -215,12 +190,9 @@ class TestAPlus(unittest.TestCase):
             result = x
 
         p = Promise()
-        p.then(None, f).then(g, h)
-        p._reject(RuntimeError('foo'))
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        p2 = p.then(None, f).then(g, h)
+        p._reject(get_fake_error(':2'))
+        await p2
         assert result == error
 
     @async_test
@@ -235,12 +207,9 @@ class TestAPlus(unittest.TestCase):
 
         p = Promise()
         p2 = p.then()
-        p2.then(f)
+        p3 = p2.then(f)
         p._resolve(42)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p3
         assert result == 42
 
     @async_test
@@ -248,7 +217,7 @@ class TestAPlus(unittest.TestCase):
         """Test that when a promise without on_resolved resolves, the next
         promise in the chain resolves to the same result."""
         result = None
-        error = RuntimeError('error')
+        error = get_fake_error()
 
         def f(x):
             nonlocal result
@@ -256,12 +225,9 @@ class TestAPlus(unittest.TestCase):
 
         p = Promise()
         p2 = p.then()
-        p2.catch(f)
+        p3 = p2.catch(f)
         p._reject(error)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p3
         assert result == error
 
     @async_test
@@ -278,13 +244,10 @@ class TestAPlus(unittest.TestCase):
         p = Promise()
         q = Promise()
         p2 = p.then(lambda x: q)
-        p2.then(f)
+        p3 = p2.then(f)
         p._resolve(42)
         q._resolve(24)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p3
         assert result == 24
 
     @async_test
@@ -293,7 +256,7 @@ class TestAPlus(unittest.TestCase):
         rejects, the next promise in the chain adopts the state of that
         promise."""
         result = None
-        error = RuntimeError('error')
+        error = get_fake_error()
 
         def f(x):
             nonlocal result
@@ -302,13 +265,10 @@ class TestAPlus(unittest.TestCase):
         p = Promise()
         q = Promise()
         p2 = p.then(lambda x: q)
-        p2.catch(f)
+        p3 = p2.catch(f)
         p._resolve(42)
         q._reject(error)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p3
         assert result == error
 
     @async_test
@@ -317,7 +277,7 @@ class TestAPlus(unittest.TestCase):
         rejects, the next promise in the chain adopts the state of that
         promise."""
         result = None
-        error = RuntimeError('error')
+        error = get_fake_error()
 
         def f(x):
             nonlocal result
@@ -326,13 +286,10 @@ class TestAPlus(unittest.TestCase):
         p = Promise()
         q = Promise()
         p2 = p.catch(lambda x: q)
-        p2.then(f)
+        p3 = p2.then(f)
         p._reject(error)
         q._resolve(24)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p3
         assert result == 24
 
     @async_test
@@ -341,8 +298,8 @@ class TestAPlus(unittest.TestCase):
         rejects, the next promise in the chain adopts the state of that
         promise."""
         result = None
-        error = RuntimeError('error')
-        error2 = RuntimeError('error2')
+        error = get_fake_error()
+        error2 = get_fake_error(':2')
 
         def f(x):
             nonlocal result
@@ -351,13 +308,10 @@ class TestAPlus(unittest.TestCase):
         p = Promise()
         q = Promise()
         p2 = p.catch(lambda x: q)
-        p2.catch(f)
+        p3 = p2.catch(f)
         p._reject(error)
         q._reject(error2)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p3
         assert result == error2
 
     @async_test
@@ -375,10 +329,7 @@ class TestAPlus(unittest.TestCase):
         p2 = p.then(lambda x: 24)
         p2.then(f)
         p._resolve(42)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p2
         assert result == 24
 
     @async_test
@@ -396,8 +347,5 @@ class TestAPlus(unittest.TestCase):
         p2 = p.then(lambda x: 24)
         p2.then(f)
         p._resolve(42)
-
-        await asyncio.sleep(0)
-        while result is None:
-            await asyncio.sleep(0.05)
+        await p2
         assert result == 24
