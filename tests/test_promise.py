@@ -275,5 +275,27 @@ class TestPromise(unittest.TestCase):
             {'status': 'rejected', 'reason': error2},
         ]
 
+    @async_test
+    async def test_cancel(self):
+        @promisify
+        async def long():
+            await asyncio.sleep(10)
+
+        p = long()
+        await asyncio.sleep(0.01)
+        assert not p.cancelled()
+        p.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await p
+        assert p.cancelled()
+
+    @async_test
+    async def test_cannot_cancel(self):
+        p = Promise.resolve(42)
+        assert not p.cancelled()
+        p.cancel()
+        await p
+        assert not p.cancelled()
+
     def test_run(self):
         assert promisio.run(lambda x: x * 2, 21) == 42

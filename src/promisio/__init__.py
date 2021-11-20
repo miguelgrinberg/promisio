@@ -2,7 +2,7 @@ import asyncio
 from functools import partial, wraps
 import inspect
 
-if not hasattr(asyncio, 'create_task'):
+if not hasattr(asyncio, 'create_task'):  # pragma: no cover
     asyncio.create_task = asyncio.ensure_future
 
 
@@ -12,9 +12,52 @@ class AggregateError(RuntimeError):
 
 
 class Promise:
-    @classmethod
-    def all(cls, promises):
-        new_promise = cls()
+    def __init__(self, f=None):
+        self.future = asyncio.Future()
+        if f:
+            f(self._resolve, self._reject)
+
+    def then(self, on_resolved=None, on_rejected=None):
+        promise = Promise()
+        self.future.add_done_callback(
+            partial(self._handle_done, on_resolved, on_rejected, promise))
+        return promise
+
+    def catch(self, handler):
+        return self.then(None, handler)
+
+    def finally_(self, handler):
+        def _finally(result):
+            return handler()
+
+        return self.then(_finally, _finally)
+
+    def cancel(self):
+        # not supported when there is no associated task
+        pass
+
+    def cancelled(self):
+        return False
+
+    @staticmethod
+    def resolve(result):
+        promise = Promise()
+        if isinstance(result, Promise):
+            result.then(lambda res: promise._resolve(res),
+                        lambda err: promise._reject(err))
+        else:
+            promise._resolve(result)
+        return promise
+
+    @staticmethod
+    def reject(error):
+        promise = Promise()
+        promise._reject(error)
+        return promise
+
+    @staticmethod
+    def all(promises):
+        new_promise = Promise()
         results = []
         total = len(promises)
         resolved = 0
@@ -31,24 +74,24 @@ class Promise:
 
         index = 0
         for promise in promises:
-            cls.resolve(promise).then(partial(_resolve, index),
-                                      new_promise._reject)
+            Promise.resolve(promise).then(partial(_resolve, index),
+                                          new_promise._reject)
             index += 1
 
         if total == resolved:
             new_promise._resolve(results)
         return new_promise
 
-    @classmethod
-    def all_settled(cls, promises):
-        return cls.all([promise.then(
+    @staticmethod
+    def all_settled(promises):
+        return Promise.all([promise.then(
             lambda value: {'status': 'fulfilled', 'value': value}).catch(
                 lambda reason: {'status': 'rejected', 'reason': reason})
             for promise in promises])
 
-    @classmethod
-    def any(cls, promises):
-        new_promise = cls()
+    @staticmethod
+    def any(promises):
+        new_promise = Promise()
         errors = []
         total = len(promises)
         rejected = 0
@@ -65,17 +108,17 @@ class Promise:
 
         index = 0
         for promise in promises:
-            cls.resolve(promise).then(new_promise._resolve,
-                                      partial(_reject, index))
+            Promise.resolve(promise).then(new_promise._resolve,
+                                          partial(_reject, index))
             index += 1
 
         if total == rejected:
             new_promise._reject(AggregateError(errors))
         return new_promise
 
-    @classmethod
-    def race(cls, promises):
-        new_promise = cls()
+    @staticmethod
+    def race(promises):
+        new_promise = Promise()
         settled = False
 
         def _resolve(result):
@@ -93,44 +136,8 @@ class Promise:
                 new_promise._reject(error)
 
         for promise in promises:
-            cls.resolve(promise).then(_resolve, _reject)
+            Promise.resolve(promise).then(_resolve, _reject)
         return new_promise
-
-    @classmethod
-    def resolve(cls, result):
-        promise = cls()
-        if isinstance(result, Promise):
-            result.then(lambda res: promise._resolve(res),
-                        lambda err: promise._reject(err))
-        else:
-            promise._resolve(result)
-        return promise
-
-    @classmethod
-    def reject(cls, error):
-        promise = cls()
-        promise._reject(error)
-        return promise
-
-    def __init__(self, f=None):
-        self.future = asyncio.Future()
-        if f:
-            f(self._resolve, self._reject)
-
-    def then(self, on_resolved=None, on_rejected=None):
-        promise = self.__class__()
-        self.future.add_done_callback(
-            partial(self._handle_done, on_resolved, on_rejected, promise))
-        return promise
-
-    def catch(self, handler):
-        return self.then(None, handler)
-
-    def finally_(self, handler):
-        def _finally(result):
-            return handler()
-
-        return self.then(_finally, _finally)
 
     def _resolve(self, result):
         self.future.set_result(result)
@@ -155,19 +162,32 @@ class Promise:
         else:
             promise._reject(result)
 
-    @classmethod
-    def _handle_done(cls, on_resolved, on_rejected, promise, future):
+    @staticmethod
+    def _handle_done(on_resolved, on_rejected, promise, future):
         try:
             result = future.result()
-            cls._handle_callback(result, on_resolved, promise)
+            Promise._handle_callback(result, on_resolved, promise)
         except BaseException as error:
-            cls._handle_callback(error, on_rejected, promise, resolve=False)
+            Promise._handle_callback(error, on_rejected, promise,
+                                     resolve=False)
 
     def __await__(self):
         def _reject(error):
             raise error
 
         return self.catch(_reject).future.__await__()
+
+
+class CancellablePromise(Promise):
+    def __init__(self, task):
+        super().__init__()
+        self.task = task
+
+    def cancel(self):
+        self.task.cancel()
+
+    def cancelled(self):
+        return self.task.cancelled()
 
 
 def promisify(func):
@@ -178,8 +198,8 @@ def promisify(func):
         except BaseException as error:
             return Promise.reject(error)
         if inspect.iscoroutine(result):
-            promise = Promise()
             task = asyncio.create_task(result)
+            promise = CancellablePromise(task)
             task.add_done_callback(
                 partial(Promise._handle_done, None, None, promise))
             return promise
