@@ -73,7 +73,7 @@ class TestAPlus(unittest.TestCase):
         await asyncio.sleep(0)
         while result is None:
             await asyncio.sleep(0.05)
-        with pytest.raises(asyncio.exceptions.InvalidStateError):
+        with pytest.raises(asyncio.InvalidStateError):
             p._resolve('foo')
         assert result == 42
 
@@ -111,7 +111,7 @@ class TestAPlus(unittest.TestCase):
         p._reject(error)
 
         await asyncio.sleep(0)
-        with pytest.raises(asyncio.exceptions.InvalidStateError):
+        with pytest.raises(asyncio.InvalidStateError):
             p._reject(ValueError('new error'))
         assert result == error
 
