@@ -7,62 +7,132 @@ if not hasattr(asyncio, 'create_task'):  # pragma: no cover
 
 
 class AggregateError(RuntimeError):
+    """An exception that holds a list of errors.
+
+    This exception is raised by :func:`Promise.any` when all of the input
+    promises are rejected.
+
+    :param errors: the list of erros.
+    """
     def __init__(self, errors):
         self.errors = errors
 
 
 class Promise:
+    """A promise class.
+
+    :param f: the promise function. If this argument is omitted, the promise is
+              created without an associated function. The provided function
+              must accept two arguments, ``resolve`` and ``reject`` that settle
+              the promise by fullfilling it or rejecting it respectively.
+
+    Note: Creating a promise object directly is often unnecessary. The
+    :func:`promisify` decorator is a much more convenient option.
+    """
     def __init__(self, f=None):
         self.future = asyncio.Future()
         if f:
             f(self._resolve, self._reject)
 
     def then(self, on_resolved=None, on_rejected=None):
+        """Appends fulfillment and rejection handlers to the promise.
+
+        :param on_resolved: an optional fulfillment handler.
+        :param on_rejected: an optional rejection handler.
+
+        Returns a new promise that resolves to the return value of the called
+        handler, or to the original settled value if a handler was not
+        provided.
+        """
         promise = Promise()
         self.future.add_done_callback(
             partial(self._handle_done, on_resolved, on_rejected, promise))
         return promise
 
     def catch(self, handler):
+        """Appends a rejection handler callback to the promise.
+
+        :param handler: the rejection handler.
+
+        Returns a new promise that resolves to the return value of the
+        handler.
+        """
         return self.then(None, handler)
 
     def finally_(self, handler):
+        """Appends a fulfillment and reject handler to the promise.
+
+        :param handler: the handler.
+
+        The handler is invoked when the promise is fulfilled or rejected.
+        Returns a new promise that resolves when the original promise settles.
+        """
         def _finally(result):
             return handler()
 
         return self.then(_finally, _finally)
 
     def cancel(self):
+        """Cancels a promise, if possible.
+
+        A promise can only be cancelled when it is directly associated with a
+        running task.
+        """
         # not supported when there is no associated task
         pass
 
     def cancelled(self):
+        """Checks if a promise has been cancelled."""
         return False
 
     @staticmethod
-    def resolve(result):
+    def resolve(value):
+        """Returns a new Promise object that resolves to the given value.
+
+        :param value: the value the promise will resolve to.
+
+        If the value is another ``Promise`` instance, the new promise will
+        resolve or reject when this promise does. If the value is an asyncio
+        ``Task`` object, the new promise will be associated with the task and
+        will pass cancellation requests to it if its :func:``Promise.cancel`
+        method is invoked. Any other value creates a promise that immediately
+        resolves to the value.
+        """
         promise = None
-        if isinstance(result, Promise):
+        if isinstance(value, Promise):
             promise = Promise()
-            result.then(lambda res: promise._resolve(res),
-                        lambda err: promise._reject(err))
-        elif isinstance(result, asyncio.Task):
-            promise = CancellablePromise(result)
-            result.add_done_callback(
+            value.then(lambda res: promise._resolve(res),
+                       lambda err: promise._reject(err))
+        elif isinstance(value, asyncio.Task):
+            promise = CancellablePromise(value)
+            value.add_done_callback(
                 partial(Promise._handle_done, None, None, promise))
         else:
             promise = Promise()
-            promise._resolve(result)
+            promise._resolve(value)
         return promise
 
     @staticmethod
-    def reject(error):
+    def reject(reason):
+        """Returns a new promise object that is rejected with the given reason.
+
+        :param reason: the rejection reason. Must be an ``Exception`` instance.
+        """
         promise = Promise()
-        promise._reject(error)
+        promise._reject(reason)
         return promise
 
     @staticmethod
     def all(promises):
+        """Wait for all promises to be resolved, or for any to be rejected.
+
+        :param promises: a list of promises to wait for.
+
+        Returns a promise that resolves to a aggregating list of all the values
+        from the resolved input promises, in the same order as given. If one or
+        more of the input promises are rejected, the returned promise is
+        rejected with the reason of the first rejected promise.
+        """
         new_promise = Promise()
         results = []
         total = len(promises)
@@ -90,6 +160,20 @@ class Promise:
 
     @staticmethod
     def all_settled(promises):
+        """Wait until all promises are resolved or rejected.
+
+        :param promises: a list of promises to wait for.
+
+        Returns a promise that resolves to a list of dicts, where each dict
+        describes the outcome of each promise. For a promise that was
+        fulfilled, the dict has this format::
+
+            {'status': 'fulfilled', 'value': <resolved-value>}
+
+        For a promise that was rejected, the dict has this format::
+
+            {'status': 'rejected', 'reason': <rejected-reason>}
+        """
         return Promise.all([promise.then(
             lambda value: {'status': 'fulfilled', 'value': value}).catch(
                 lambda reason: {'status': 'rejected', 'reason': reason})
@@ -97,6 +181,15 @@ class Promise:
 
     @staticmethod
     def any(promises):
+        """Wait until any of the promises given resolves.
+
+        :oaram promises: a list of promises to wait for.
+
+        Returns a promise that resolves with the value of the first input
+        promise. Promise rejections are ignored, except when all the input
+        promises are rejected, in which case the returned promise rejects with
+        an :class:`AggregateError`.
+        """
         new_promise = Promise()
         errors = []
         total = len(promises)
@@ -124,6 +217,13 @@ class Promise:
 
     @staticmethod
     def race(promises):
+        """Wait until any of the promises is fulfilled or rejected.
+
+        :param promises: a list of promises to wait for.
+
+        Returns a promise that resolves or rejects with the first input
+        promise that settles.
+        """
         new_promise = Promise()
         settled = False
 
@@ -197,6 +297,22 @@ class CancellablePromise(Promise):
 
 
 def promisify(func):
+    """Create a promise-based async function from regular or async functions.
+
+    Examples::
+
+        @promisfy
+        def add(arg1, arg2):
+            return arg1 + arg2
+
+        @promisify
+        async def random_sleep():
+            await asyncio.sleep(random.random())
+
+        async def test():
+            result = await add(1, 2)
+            await random_sleep()
+    """
     @wraps(func)
     def wrapper(*args, **kwargs):
         try:
@@ -211,7 +327,13 @@ def promisify(func):
 
 
 def run(func, *args, **kwargs):
+    """Run an async loop until the given promise-based function returns.
+
+    :param func: the promise-based function to run.
+    :param args: positional arguments to pass to the function.
+    :param kwargs: keyword arguments to pass to the function.
+    """
     async def _run():
-        return await Promise.resolve(func(*args, **kwargs))
+        return await func(*args, **kwargs)
 
     return asyncio.get_event_loop().run_until_complete(_run())

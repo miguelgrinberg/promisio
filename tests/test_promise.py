@@ -302,4 +302,8 @@ class TestPromise(unittest.TestCase):
         assert not p.cancelled()
 
     def test_run(self):
-        assert promisio.run(lambda x: x * 2, 21) == 42
+        @promisify
+        def f(x):
+            return x * 2
+
+        assert promisio.run(f, 21) == 42
