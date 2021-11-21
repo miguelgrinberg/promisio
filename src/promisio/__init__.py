@@ -75,15 +75,13 @@ class Promise:
     def cancel(self):
         """Cancels a promise, if possible.
 
-        A promise can only be cancelled when it is directly associated with a
-        running task.
+        A promise that is cancelled rejects with a ``asyncio.CancelledError``.
         """
-        # not supported when there is no associated task
-        pass
+        return self.future.cancel()
 
     def cancelled(self):
         """Checks if a promise has been cancelled."""
-        return False
+        return self.future.cancelled()
 
     @staticmethod
     def resolve(value):
@@ -104,7 +102,7 @@ class Promise:
             value.then(lambda res: promise._resolve(res),
                        lambda err: promise._reject(err))
         elif isinstance(value, asyncio.Task):
-            promise = CancellablePromise(value)
+            promise = TaskPromise(value)
             value.add_done_callback(
                 partial(Promise._handle_done, None, None, promise))
         else:
@@ -284,13 +282,15 @@ class Promise:
         return self.catch(_reject).future.__await__()
 
 
-class CancellablePromise(Promise):
+class TaskPromise(Promise):
     def __init__(self, task):
         super().__init__()
         self.task = task
 
     def cancel(self):
-        self.task.cancel()
+        # cancel the task associated with this future
+        # (the future will receive the cancellation error)
+        return self.task.cancel()
 
     def cancelled(self):
         return self.task.cancelled()

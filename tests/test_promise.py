@@ -288,16 +288,38 @@ class TestPromise(unittest.TestCase):
         p = long()
         await asyncio.sleep(0.01)
         assert not p.cancelled()
-        p.cancel()
+        assert p.cancel()
         with pytest.raises(asyncio.CancelledError):
             await p
         assert p.cancelled()
 
     @async_test
+    async def test_cancel_mid_chain(self):
+        event = asyncio.Event()
+        result = None
+
+        @promisify
+        async def long():
+            await event.wait()
+
+        def _reject(error):
+            nonlocal result
+            result = error
+
+        p = long()
+        p2 = p.then()
+        p3 = p2.catch(_reject)
+        p2.cancel()
+        await p3
+        assert result.__class__ == asyncio.CancelledError
+        event.set()
+        await p
+
+    @async_test
     async def test_cannot_cancel(self):
         p = Promise.resolve(42)
         assert not p.cancelled()
-        p.cancel()
+        assert not p.cancel()
         await p
         assert not p.cancelled()
 
