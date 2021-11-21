@@ -6,10 +6,12 @@
 promisio
 ========
 
+JavaScript-style async programming for Python.
+
 .. toctree::
    :maxdepth: 2
-   :caption: Contents:
-
+   
+   quickstart.rst
    api.rst
 
 
