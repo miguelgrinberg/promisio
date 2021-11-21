@@ -41,11 +41,17 @@ class Promise:
 
     @staticmethod
     def resolve(result):
-        promise = Promise()
+        promise = None
         if isinstance(result, Promise):
+            promise = Promise()
             result.then(lambda res: promise._resolve(res),
                         lambda err: promise._reject(err))
+        elif isinstance(result, asyncio.Task):
+            promise = CancellablePromise(result)
+            result.add_done_callback(
+                partial(Promise._handle_done, None, None, promise))
         else:
+            promise = Promise()
             promise._resolve(result)
         return promise
 
@@ -198,13 +204,8 @@ def promisify(func):
         except BaseException as error:
             return Promise.reject(error)
         if inspect.iscoroutine(result):
-            task = asyncio.create_task(result)
-            promise = CancellablePromise(task)
-            task.add_done_callback(
-                partial(Promise._handle_done, None, None, promise))
-            return promise
-        else:
-            return Promise.resolve(result)
+            result = asyncio.create_task(result)
+        return Promise.resolve(result)
 
     return wrapper
 

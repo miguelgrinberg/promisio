@@ -20,18 +20,19 @@ class TestAPlus(unittest.TestCase):
     async def test_aplus_2_2_1_1(self):
         """Test that if on_resolved is not a callable it is ignored."""
         p = Promise()
-        p.then(123).then('foo').then({'foo': 'bar'}).then(['foo', 'bar'])
+        p2 = p.then(123).then('foo').then({'foo': 'bar'}).then(['foo', 'bar'])
         p._resolve(42)
-        await p
+        await p2
 
     @async_test
     async def test_aplus_2_2_1_2(self):
         """Test that if on_rejected is not a callable it is ignored."""
         p = Promise()
-        p.then(None, 123).then(None, 'foo').then(None, {'foo': 'bar'}).then(
-            None, ['foo', 'bar'])
+        p2 = p.then(None, 123).then(None, 'foo').then(
+            None, {'foo': 'bar'}).then(None, ['foo', 'bar'])
         p._reject(get_fake_error())
-        await p.catch(lambda err: None)
+        with pytest.raises(RuntimeError):
+            await p2
 
     @async_test
     async def test_aplus_2_2_2_1(self):

@@ -170,6 +170,7 @@ class TestPromise(unittest.TestCase):
         p3 = promisify(h)()
         result = await Promise.any([p1, p2, p3])
         assert result == 'h'
+        await Promise.all_settled([p1, p2, p3])
 
     @async_test
     async def test_any_rejected(self):
@@ -198,6 +199,7 @@ class TestPromise(unittest.TestCase):
             assert error.errors == [error1, error2, error3]
         else:
             assert False
+        await Promise.all_settled([p1, p2, p3])
 
     @async_test
     async def test_empty_any(self):
@@ -223,6 +225,7 @@ class TestPromise(unittest.TestCase):
         p3 = promisify(h)()
         result = await Promise.race([p1, p2, p3])
         assert result == 'h'
+        await Promise.all_settled([p1, p2, p3])
 
     @async_test
     async def test_racei_rejected(self):
@@ -245,6 +248,7 @@ class TestPromise(unittest.TestCase):
         p3 = promisify(h)()
         with pytest.raises(RuntimeError):
             await Promise.race([p1, p2, p3])
+        await Promise.all_settled([p1, p2, p3])
 
     @async_test
     async def test_promisify(self):
