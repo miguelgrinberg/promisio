@@ -32,7 +32,7 @@ async def main():
 
 The return value of the decorated function is a JavaScript-style promise object
 that can be awaited. The `then()`, `catch()` and `finally_()` methods to chain
-promises as in JavaScript. The `Promise.all()`, `Promise.all_settled()`,
+promises work as in JavaScript. The `Promise.all()`, `Promise.all_settled()`,
 `Promise.any()`, `Promise.race()`, `Promise.resolve()` and `Promise.reject()`
 are also available. Promises in this package are extended to also support
 cancellation via the `cancel()` and `cancelled()` methods.
