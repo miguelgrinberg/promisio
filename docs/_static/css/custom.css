@@ -1,0 +1,9 @@
+div.sphinxsidebar {
+	max-height: calc(100% - 30px);
+	overflow-y: auto;
+	overflow-x: hidden;
+}
+
+.py.class, .py.method, .py.function, .py.property {
+  margin-top: 20px;
+}

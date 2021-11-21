@@ -49,26 +49,26 @@ class Promise:
             partial(self._handle_done, on_resolved, on_rejected, promise))
         return promise
 
-    def catch(self, handler):
+    def catch(self, on_rejected):
         """Appends a rejection handler callback to the promise.
 
-        :param handler: the rejection handler.
+        :param on_rejected: the rejection handler.
 
         Returns a new promise that resolves to the return value of the
         handler.
         """
-        return self.then(None, handler)
+        return self.then(None, on_rejected)
 
-    def finally_(self, handler):
+    def finally_(self, on_settled):
         """Appends a fulfillment and reject handler to the promise.
 
-        :param handler: the handler.
+        :param on_settled: the handler.
 
         The handler is invoked when the promise is fulfilled or rejected.
         Returns a new promise that resolves when the original promise settles.
         """
         def _finally(result):
-            return handler()
+            return on_settled()
 
         return self.then(_finally, _finally)
 
@@ -94,7 +94,7 @@ class Promise:
         If the value is another ``Promise`` instance, the new promise will
         resolve or reject when this promise does. If the value is an asyncio
         ``Task`` object, the new promise will be associated with the task and
-        will pass cancellation requests to it if its :func:``Promise.cancel`
+        will pass cancellation requests to it if its :func:`Promise.cancel`
         method is invoked. Any other value creates a promise that immediately
         resolves to the value.
         """
@@ -301,7 +301,7 @@ def promisify(func):
 
     Examples::
 
-        @promisfy
+        @promisify
         def add(arg1, arg2):
             return arg1 + arg2
 
