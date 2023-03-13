@@ -1,7 +1,7 @@
 Quick Start
 -----------
 
-This package implements JavaScript-style promises. The
+This package implements JavaScript-style promises in Python with the asyncio package. The
 `JavaScript Promise documentation <https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise>`_
 is a good introductory reference.
 
