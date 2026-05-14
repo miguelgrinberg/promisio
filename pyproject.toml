@@ -25,6 +25,9 @@ Homepage = "https://github.com/miguelgrinberg/promisio"
 docs = [
     "sphinx",
 ]
+dev = [
+    "tox",
+]
 
 [tool.setuptools]
 zip-safe = false
