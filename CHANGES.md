@@ -1,5 +1,9 @@
 # Promisio Change Log
 
+**Release 0.2** - 2026-05-15
+
+- Python 3.14 support ([commit](https://github.com/miguelgrinberg/promisio/commit/edb3538a1d4ef789520f2f048a55d3f52d368b6c))
+
 **Release 0.1.1** - 2021-11-22
 
 - Promise cancellation improvements ([commit](https://github.com/miguelgrinberg/promisio/commit/29c9a4973fda789f6bd937a47e44bacdffb2265e))
