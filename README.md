@@ -1,6 +1,6 @@
 # promisio
 
-[![Build status](https://github.com/miguelgrinberg/promisio/workflows/build/badge.svg)](https://github.com/miguelgrinberg/promisio/actions) [![codecov](https://codecov.io/gh/miguelgrinberg/promisio/branch/main/graph/badge.svg)](https://codecov.io/gh/miguelgrinberg/promisio)
+[![tests](https://code.miguelgrinberg.com/miguelgrinberg/promisio/badges/workflows/tests.yml/badge.svg)](https://code.miguelgrinberg.com/miguelgrinberg/promisio/actions)
 
 JavaScript-style async programming for Python.
 
@@ -39,7 +39,22 @@ cancellation via the `cancel()` and `cancelled()` methods.
 
 ## Resources
 
-- [Documentation](http://promisio.readthedocs.io/en/latest/)
+- [git](https://code.miguelgrinberg.com/miguelgrinberg/promisio)
+- [Change Log](https://code.miguelgrinberg.com/miguelgrinberg/promisio/src/branch/main/CHANGES.md)
+- [Documentation](https://promisio.readthedocs.io/)
 - [PyPI](https://pypi.python.org/pypi/promisio)
-- [Change Log](https://github.com/miguelgrinberg/promisio/blob/main/CHANGES.md)
+- [Contributor's guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
 
+Sponsor this project
+--------------------
+
+This project relies on contributions from its users. If you benefit from it please consider making a single or ongoing monetary contribution in one of the following platforms:
+
+- [Github Sponsors](https://github.com/sponsors/miguelgrinberg)
+- [Patreon](https://patreon.com/miguelgrinberg)
+- [Buy me a Coffee](https://buymeacoffee.com/miguelgrinberg)
+- [thanks.dev](https://thanks.dev/u/gh/miguelgrinberg)
+- [PayPal](https://paypal.me/miguelgrinberg)
+
+Thank you!
